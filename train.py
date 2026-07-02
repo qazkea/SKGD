@@ -12,13 +12,15 @@ import os
 import argparse
 
 import torch
-from torch.utils.data import DataLoader
 from torch.optim import AdamW
 
 from config import Config
-from data import CXRDataset
 from models import SKGDM, ConditionalUNet, VAEWrapper, TextEncoderWrapper, NoiseScheduler
 from models.skgdm import SKGDMConfig
+
+
+def get_dataloader(args, cfg, tokenizer):
+    raise NotImplementedError("Provide your own DataLoader yielding (image, mask, input_ids, attention_mask).")
 
 
 def build_model(cfg: Config, device: torch.device) -> SKGDM:
@@ -68,17 +70,7 @@ def main():
     model = build_model(cfg, device)
     tokenizer = model.text_encoder.tokenizer
 
-    dataset = CXRDataset(
-        manifest_csv=args.manifest or cfg.data.reports_csv,
-        image_root=cfg.data.mimic_cxr_dir,
-        mask_root=cfg.data.segmentation_mask_dir,
-        tokenizer=tokenizer,
-        image_size=cfg.data.image_size,
-        mask_size=cfg.data.mask_size,
-        max_length=cfg.data.max_length,
-    )
-    loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True,
-                        num_workers=cfg.data.num_workers, pin_memory=True)
+    loader = get_dataloader(args, cfg, tokenizer)
 
     optimizer = AdamW(model.trainable_parameters(), lr=args.lr)
     scaler = torch.cuda.amp.GradScaler(enabled=device.type == "cuda")
